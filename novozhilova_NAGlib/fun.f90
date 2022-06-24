@@ -6,7 +6,7 @@ module fun
  real(c_double) zex, dz, tend, dtr(2), q(3), i(2), th(2), a(2), dcir(2), r(2), f0(3), dt, pitch, f10, f20, f30, ptol, hstart, zstart
     complex(c_double_complex) fp(2)
     logical(c_bool) errass
-    
+
     integer(c_int) breaknum(3)
     real(c_double) phitmp0(3), phitmp1(3)
     complex(c_double_complex) fc, fcarr(3)
@@ -89,7 +89,7 @@ contains
         integer(c_int) err_alloc
 
         allocate (f(6, nt), p(neqp, nz), u(nz), tax(nt), zax(nz), mean(nz), eta(2, nt), etag(2, nt), w(3, nt - 1), w1(3, nt - 1), &
-                  idxre(2, ne), idxim(2, ne), pgot(neqp), ppgot(neqp), pmax(neqp), thres(neqp), workp(lenwrk), work(lwork), iwork(liwork), &
+          idxre(2, ne), idxim(2, ne), pgot(neqp), ppgot(neqp), pmax(neqp), thres(neqp), workp(lenwrk), work(lwork), iwork(liwork), &
                   wos(3, nt - 1), phi(3, nt), phios(3, nt), stat=err_alloc)
 
         if (err_alloc /= 0) then
@@ -155,7 +155,7 @@ contains
         import
         implicit none
 
-        integer(c_int) nt, neq, i, j, ipar, iout, idid, itol
+        integer(c_int) neq, i, j, ipar, iout, idid, itol
         real(c_double) :: h, t, zwant, zgot, rpar, rtol, atol
         real(c_double) y(6)
         logical(4) pressed
@@ -199,6 +199,12 @@ contains
         iwork(5) = 6
 
         call dopri5(6, dfdt, t, y, tend, rtol, atol, itol, solout, iout, work, lwork, iwork, liwork, rpar, ipar, idid)
+
+        eta(:, nt) = eff(p(:, nz))
+        etag(:, nt) = pitch**2/(pitch**2 + 1)*eta(:, nt)
+        do j = 1, neqf
+            f(j, nt) = y(j)
+        end do
 
     end subroutine ode4f
 
@@ -358,33 +364,35 @@ contains
             end
         end interface
 
-        integer(c_int) nr, n, nd, icomp(nd), ipar, irtrn, j
+        integer(c_int) nr, n, nd, icomp(nd), ipar, irtrn, j, it
         real(c_double) xold, x, con(5*nd), rpar, y(neqf), xout
         logical(4) pressed
         character(1) key
         integer(c_int), parameter :: esc = 27
-        common/intern/xout
+        common/intern/xout, it
 
         if (nr .eq. 1) then
             write (*, '(a,f12.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,\,a)') 'Time = ', xout, '   |F1| = ', abs(y(1)), '   |F2| = ', abs(y(3)), '   |F3| = ', abs(y(5)), &
                 '   Eff1 = ', eta(1, nr), '   Eff2 = ', eta(2, nr), char(13)
             xout = x + dt
-            eta(:, nr) = eff(p(:, nz))
-            etag(:, nr) = pitch**2/(pitch**2 + 1)*eta(:, nr)
-            do j = 1,neqf
-                f(j,nr) = y(j)
-            enddo
+            it = 1
+            eta(:, it) = eff(p(:, nz))
+            etag(:, it) = pitch**2/(pitch**2 + 1)*eta(:, it)
+            do j = 1, neqf
+                f(j, it) = y(j)
+            end do
         else
 10          continue
             if (x .ge. xout) then
                 write (*, '(a,f12.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,\,a)') 'Time = ', xout, '   |F1| = ', abs(y(1)), '   |F2| = ', abs(y(3)), '   |F3| = ', abs(y(5)), &
                     '   Eff1 = ', eta(1, nr), '   Eff2 = ', eta(2, nr), char(13)
                 xout = xout + dt
-                eta(:, nr) = eff(p(:, nz))
-                etag(:, nr) = pitch**2/(pitch**2 + 1)*eta(:, nr)
-                do j = 1,neqf
-                    f(j,nr) = y(j)
-                enddo
+                it = it + 1
+                eta(:, it) = eff(p(:, nz))
+                etag(:, it) = pitch**2/(pitch**2 + 1)*eta(:, it)
+                do j = 1, neqf
+                    f(j, it) = y(j)
+                end do
                 goto 10
             end if
         end if

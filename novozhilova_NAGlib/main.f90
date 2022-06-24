@@ -118,7 +118,7 @@ program sys15f
         write (3, '(4e17.8)') tax(i + 1), wos(1, i), wos(2, i), wos(3, i)
     end do
     close (3)
-    
+
     stop
 101 print *, 'error of file open.'
     pause
