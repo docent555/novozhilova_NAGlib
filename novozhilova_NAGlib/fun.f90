@@ -372,27 +372,27 @@ contains
         common/intern/xout, it
 
         if (nr .eq. 1) then
-            write (*, '(a,f12.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,\,a)') 'Time = ', xout, '   |F1| = ', abs(y(1)), '   |F2| = ', abs(y(3)), '   |F3| = ', abs(y(5)), &
-                '   Eff1 = ', eta(1, nr), '   Eff2 = ', eta(2, nr), char(13)
-            xout = x + dt
             it = 1
             eta(:, it) = eff(p(:, nz))
             etag(:, it) = pitch**2/(pitch**2 + 1)*eta(:, it)
+            write (*, '(a,f12.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,\,a)') 'Time = ', xout, '   |F1| = ', abs(y(1)), '   |F2| = ', abs(y(3)), '   |F3| = ', abs(y(5)), &
+                '   Eff1 = ', eta(1, nr), '   Eff2 = ', eta(2, nr), char(13)                        
             do j = 1, neqf
                 f(j, it) = y(j)
             end do
+            xout = x + dt
         else
 10          continue
-            if (x .ge. xout) then
-                write (*, '(a,f12.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,\,a)') 'Time = ', xout, '   |F1| = ', abs(y(1)), '   |F2| = ', abs(y(3)), '   |F3| = ', abs(y(5)), &
-                    '   Eff1 = ', eta(1, nr), '   Eff2 = ', eta(2, nr), char(13)
-                xout = xout + dt
+            if (x .ge. xout) then                                
                 it = it + 1
                 eta(:, it) = eff(p(:, nz))
                 etag(:, it) = pitch**2/(pitch**2 + 1)*eta(:, it)
+                write (*, '(a,f12.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,\,a)') 'Time = ', xout, '   |F1| = ', abs(y(1)), '   |F2| = ', abs(y(3)), '   |F3| = ', abs(y(5)), &
+                    '   Eff1 = ', eta(1, it), '   Eff2 = ', eta(2, it), char(13)                
                 do j = 1, neqf
                     f(j, it) = y(j)
                 end do
+                xout = xout + dt
                 goto 10
             end if
         end if

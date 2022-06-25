@@ -76,7 +76,7 @@ program sys15f
 
     open (1, file='F.dat')
     do i = 1, nt
-        write (1, '(4e17.8)') tax(i), abs(f(1, i)), abs(f(2, i)), abs(f(3, i))
+        write (1, '(4e17.8)') tax(i), abs(f(1, i)), abs(f(3, i)), abs(f(5, i))
     end do
     close (1)
 
