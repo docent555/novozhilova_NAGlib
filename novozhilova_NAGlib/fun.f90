@@ -405,7 +405,8 @@ contains
                 key = getcharqq()
                 if (ichar(key) .eq. 121 .or. ichar(key) .eq. 89) then
                     nt = nr
-                    return
+                    irtrn = -1
+                    !return
                 end if
             end if
         end if

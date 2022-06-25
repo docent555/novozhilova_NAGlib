@@ -1,6 +1,6 @@
  &PARAM
  ne = 32
- tend = 0.1
+ tend = 40
  zex = 40
  q1 = 1400
  q2 = 1400
