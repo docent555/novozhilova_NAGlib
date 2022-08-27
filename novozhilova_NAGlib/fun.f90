@@ -121,9 +121,11 @@ contains
         use, intrinsic :: iso_c_binding
         import
         implicit none
+        
+        real(8) ftol, ptol
 
         namelist /param/ ne, tend, zex, q1, q2, q3, i1, i2, th1, th2, a1, a2, dtr1, dtr2, &
-            dcir1, dcir2, r1, r2, f10, f20, f30, dt, dz, pitch
+            dcir1, dcir2, r1, r2, f10, f20, f30, dt, dz, pitch, ftol, ptol
 
         real(c_double) q1, q2, q3, i1, i2, th1, th2, a1, a2, dtr1, dtr2, dcir1, dcir2, r1, r2
 
@@ -227,7 +229,7 @@ contains
 
         call d02nvf(neqmax, ny2dim, maxord, 'newton', petzld, const, tcrit, hmin, hmax, &
                     h0, maxstp, mxhnil, 'average-l2', rwork, ifail)
-        call d02nsf(neq, neqmax, 'n', nwkjac, rwork, ifail)
+        call d02nsf(neq, neqmax,'a', nwkjac, rwork, ifail)
 
         itrace = 0
         ifail = 1
@@ -668,7 +670,7 @@ contains
             f1, f2, f3, phi1, phi2, phi3, a1, a2, ph311, ph322, phi13, phi23
         complex(c_double_complex) x1, x2
 
-        hxd = -h*d
+        hxd = h*d
 
         x1 = xi(p(1:2*ne, :), 1)
         x2 = xi(p(2*ne + 1:4*ne, :), 1)
@@ -706,47 +708,47 @@ contains
         phi13 = phi1 - phi3
         phi23 = phi2 - phi3
 
-        pp(1, 1) = 1.0d0 - hxd*(q31)
-        pp(1, 2) = hxd*q31*(i1*(x1i*sin1 + x1r*cos1) + 2*r1*f3*dsin(ph311))
+        pp(1, 1) = 1.0d0 + hxd*(q31)
+        pp(1, 2) = -hxd*q31*(i1*(x1i*sin1 + x1r*cos1) + 2*r1*f3*dsin(ph311))
         !pp(1,3) = 0
         !pp(1,4) = 0
-        pp(1, 5) = hxd*2*r1*q31*dcos(ph311)
-        pp(1, 6) = hxd*2*r1*q31*f3*dsin(ph311)
+        pp(1, 5) = -hxd*2*r1*q31*dcos(ph311)
+        pp(1, 6) = -hxd*(-2*r1*q31*f3*dsin(ph311))
 
-        pp(2, 1) = -hxd*q31/f1**2*(i1*(x1r*cos1 + x1i*sin1) + 2*r1*f3*dsin(ph311))
-        pp(2, 2) = 1 + hxd*(q31*i1/f1*(-x1r*sin1 + x1i*cos1) - 2*r1*q31*f3/f1*dcos(ph311))
+        pp(2, 1) = -hxd*(-q31/f1**2*(i1*(x1r*cos1 + x1i*sin1) + 2*r1*f3*dsin(ph311)))
+        pp(2, 2) = 1.0d0 - hxd*(q31/f1*(i1*(-x1r*sin1 + x1i*cos1) - 2*r1*f3*dcos(ph311)))
         !pp(2,3) = 0
         !pp(2,4) = 0
-        pp(2, 5) = hxd*2*r1*q31/f1*dsin(ph311)
-        pp(2, 6) = hxd*2*r1*q31*f3/f1*dcos(ph311)
+        pp(2, 5) = -hxd*2*r1*q31/f1*dsin(ph311)
+        pp(2, 6) = -hxd*2*r1*q31*f3/f1*dcos(ph311)
 
         !pp(3,1) = 0
-        !pp(3,2) =0
-        pp(3, 3) = 1 - hxd*q32
-        pp(3, 4) = hxd*q32*i2*(x2i*sin2 + x2r*cos2) + 2*r2*f3*dsin(ph322)
-        pp(3, 5) = hxd*2*r2*q32*dcos(ph322)
-        pp(3, 6) = -hxd*2*r2*q32*f3*sin(ph322)
-
+        !pp(3,2) = 0
+        pp(3, 3) = 1.0d0 + hxd*q32
+        pp(3, 4) = -hxd*q32*(i2*(x2i*sin2 + x2r*cos2) + 2*r2*f3*dsin(ph322))
+        pp(3, 5) = -hxd*2*r2*q32*dcos(ph322)
+        pp(3, 6) = -hxd*(-2*r2*q32*f3*dsin(ph322))
+        
         !pp(4,1) = 0
-        !pp(4,2) = 0
-        pp(4, 3) = -hxd*q32/f2**2*(i2*(x2r*cos2 + x2i*sin2) + 2*r2*f3*dsin(ph322))
-        pp(4, 4) = 1 + hxd*q32*(i2/f2*(-x2r*sin2 + x2i*cos2) - 2*r2*f3/f2*dcos(ph322))
-        pp(4, 5) = hxd*2*r2*q32/f2*dsin(ph322)
-        pp(4, 6) = hxd*2*r2*q32*f3/f2*dcos(ph322)
+        !pp(4,2) = 0       
+        pp(4, 3) = -hxd*(-q32/f2**2*(i2*(x2r*cos2 + x2i*sin2) + 2*r2*f3*dsin(ph322)))
+        pp(4, 4) = 1.0d0 - hxd*(q32/f2*(i2*(-x2r*sin2 + x2i*cos2) - 2*r2*f3*dcos(ph322)))        
+        pp(4, 5) = -hxd*2*r2*q32/f2*dsin(ph322)
+        pp(4, 6) = -hxd*2*r2*q32*f3/f2*dcos(ph322)
 
-        pp(5, 1) = hxd*a1*dcos(phi13)
-        pp(5, 2) = -hxd*a1*f1*dsin(phi13)
-        pp(5, 3) = hxd*a2*dcos(phi23)
-        pp(5, 4) = -hxd*a2*f2*dsin(phi23)
-        pp(5, 5) = 1 + hxd
-        pp(5, 6) = hxd*(a1*f1*dsin(phi13) + a2*f2*dsin(phi23))
+        pp(5, 1) = -hxd*a1*dcos(phi13)
+        pp(5, 2) = hxd*a1*f1*dsin(phi13)
+        pp(5, 3) = -hxd*a2*dcos(phi23)
+        pp(5, 4) = hxd*a2*f2*dsin(phi23)
+        pp(5, 5) = 1.0d0 - hxd
+        pp(5, 6) = -hxd*(a1*f1*dsin(phi13) + a2*f2*dsin(phi23))
 
-        pp(6, 1) = hxd*a1/f3*dsin(phi13)
-        pp(6, 2) = hxd*a1*f1/f3*dcos(phi13)
-        pp(6, 3) = hxd*a2/f3*dsin(phi23)
-        pp(6, 4) = hxd*a2*f2/f3*dcos(phi23)
-        pp(6, 5) = hxd*(-a1*f1/f3**2*dsin(phi13) - a2*f2/f3**2*dsin(phi23))
-        pp(6, 6) = hxd*(-a1*f1/f3*dcos(phi13) - a2*f2/f3*dcos(phi23))
+        pp(6, 1) = -hxd*a1/f3*dsin(phi13)
+        pp(6, 2) = -hxd*a1*f1/f3*dcos(phi13)
+        pp(6, 3) = -hxd*a2/f3*dsin(phi23)
+        pp(6, 4) = -hxd*a2*f2/f3*dcos(phi23)
+        pp(6, 5) = hxd/f3**2*(a1*f1*dsin(phi13) + a2*f2*dsin(phi23))        
+        pp(6, 6) = 1.0d0 - hxd*(-a1*f1/f3*dcos(phi13) - a2*f2/f3*dcos(phi23))
 
         return
     end
