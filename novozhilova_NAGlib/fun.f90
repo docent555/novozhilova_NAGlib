@@ -2,17 +2,17 @@ module fun
     use, intrinsic :: iso_c_binding
     use ifcore
 
-    integer(c_int) ne, nt, nz, freq_out, neqp, lenwrk, l, method, ifail, neqf, lwork, liwork, nrd
+    integer(c_int) ne, nt, nz, freq_out, neqp, lenwrk, l, method, ifail, neqf, lwork, liwork, nrd, it
     real(c_double) zex, dz, tend, dtr(2), q(3), i(2), th(2), a(2), dcir(2), r(2), &
         f0(3), dt, pitch, f10, f20, f30, ptol, hstart, zstart, xout
     complex(c_double_complex) fp(2)
     logical(c_bool) errass
 
-    common xout
+    common xout, it
 
     integer(c_int) breaknum(3)
     real(c_double) phitmp0(3), phitmp1(3)
-    complex(c_double_complex) fc, fcarr(3)
+    complex(c_double_complex) fc, fcomp(3)
 
     integer(c_int), allocatable, target :: idxre(:, :), idxim(:, :), iwork(:)
     complex(c_double_complex), allocatable, target :: mean(:)
@@ -91,7 +91,7 @@ contains
 
         integer(c_int) err_alloc
 
-        allocate (f(6, nt), p(neqp, nz), u(nz), tax(nt), zax(nz), mean(nz), eta(2, nt), etag(2, nt), w(3, nt - 1), w1(3, nt - 1), &
+        allocate (f(6, nt), p(neqp, nz), u(nz), tax(nt), zax(nz), mean(nz), eta(2, nt), etag(2, nt), w(3, nt - 1), w1(3, nt), &
           idxre(2, ne), idxim(2, ne), pgot(neqp), ppgot(neqp), pmax(neqp), thres(neqp), workp(lenwrk), work(lwork), iwork(liwork), &
                   wos(3, nt - 1), phi(3, nt), phios(3, nt), stat=err_alloc)
 
@@ -181,7 +181,7 @@ contains
         !iwork(5) = 6
 
         integer(c_int), parameter :: neq = 6, neqmax = neq, nrw = 50 + 4*neqmax, ninf = 23, nwkjac = neqmax*(neqmax + 1), &
-                                     maxord = 5, ny2dim = maxord + 1, maxstp = 5000, mxhnil = 5
+                                     maxord = 5, ny2dim = maxord + 1, maxstp = 150000, mxhnil = 5
         real(c_double), parameter :: h0 = 0.0d0, hmax = 10.0d0, hmin = 1.0d-10
         integer(c_int) itask, itol, itrace, inform(ninf)
         real(c_double) atolnag(neqmax), const(6), rtolnag(neqmax), rwork(nrw), wkjac(nwkjac), y(neqmax), ydot(neqmax), &
@@ -192,8 +192,8 @@ contains
         tout = tend
         itask = 1
         itol = 1
-        rtol(1) = 1.0d-4
-        atol(1) = 1.0d-7
+        rtol(1) = 1.0d-5
+        atol(1) = 1.0d-8
         do i = 1, 6
             const(i) = 0.0d0
         end do
@@ -210,8 +210,17 @@ contains
         do i = 1, nz - 1
             zwant = i*dz
             call d02pcf(dpdz, zwant, zgot, pgot, ppgot, pmax, workp, ifail)
+
+            if (ifail .ne. 0) then            
+                write (*, *)
+                write (*, 99998) 'exit d02pcf with ifail = ', ifail, '  and t = ', t
+                pause
+                stop
+            end if
+
             p(:, i + 1) = pgot
         end do
+99998   format(1x, a, i2, a, d12.5)
 
         eta(:, 1) = eff(p(:, nz))
         etag(:, 1) = pitch**2/(pitch**2 + 1)*eta(:, 1)
@@ -223,9 +232,17 @@ contains
         itrace = 0
         ifail = 1
         xout = dt
+        it = 2
 
         call d02nbf(neq, neqmax, t, tout, y, ydot, rwork, rtol, atol, itol, inform, dfdt, ysave, &
                     ny2dim, jac, wkjac, nwkjac, monitr, itask, itrace, ifail)
+
+        if (ifail .ne. 0) then
+            write (*, *)
+            write (*, 99998) 'exit d02nbf with ifail = ', ifail, '  and t = ', t
+            pause
+            stop
+        end if
 
         !call dopri5(6, dfdt, t, y, tend, rtol, atol, itol, solout, iout, work, lwork, iwork, liwork, rpar, ipar, idid)
 
@@ -463,6 +480,15 @@ contains
         do jj = 1, nz - 1
             zwant = zax(jj + 1)
             call d02pcf(dpdz, zwant, zgot, pgot, ppgot, pmax, workp, ifail)
+
+            if (ifail .ne. 0) then        
+                write (*, *)
+                write (*, 99998) 'exit d02pcf with ifail = ', ifail, '  and t = ', t
+                pause
+                stop
+            end if
+99998       format(1x, a, i2, a, d12.5)
+
             p(:, jj + 1) = pgot
             !if (jj .eq. 1) then
             !    open (1, file='test.dat')
@@ -542,13 +568,13 @@ contains
         s(5) = -f3 + a1*f1*dcos(phi1 - phi3) + a2*f2*dcos(phi2 - phi3)
         s(6) = a1*f1/f3*dsin(phi1 - phi3) + a2*f2/f3*dsin(phi2 - phi3)
 
-        if (mod(iter_num, 4) .eq. 0) then
-            w1(1, time_num) = s(2)
-            w1(2, time_num) = s(4)
-            w1(3, time_num) = s(6)
-            time_num = time_num + 1
-        end if
-        iter_num = iter_num + 1
+        !if (mod(iter_num, 4) .eq. 0) then
+        !    w1(1, time_num) = s(2)
+        !    w1(2, time_num) = s(4)
+        !    w1(3, time_num) = s(6)
+        !    time_num = time_num + 1
+        !end if
+        !iter_num = iter_num + 1
     end subroutine dfdt
 
     subroutine calc_u(u, zex, nz, zax)
@@ -588,8 +614,8 @@ contains
             it = 1
             eta(:, it) = eff(p(:, nz))
             etag(:, it) = pitch**2/(pitch**2 + 1)*eta(:, it)
-            write (*, '(a,f12.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,\,a)') 'time = ', xout, '   |f1| = ', abs(y(1)), '   |f2| = ', abs(y(3)), '   |f3| = ', abs(y(5)), &
-                '   eff1 = ', eta(1, nr), '   eff2 = ', eta(2, nr), char(13)
+            write (*, '(a,f12.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,\,a)') 'time = ', xout, '   |f1| = ', abs(y(1)), '   |f2| = ', abs(y(3)), &
+                '   |f3| = ', abs(y(5)), '   eff1 = ', eta(1, nr), '   eff2 = ', eta(2, nr), char(13)
             do j = 1, neqf
                 f(j, it) = y(j)
             end do
@@ -726,8 +752,9 @@ contains
     end
 
     subroutine monitr(n, nmax, t, hlast, h, y, ydot, ysave, r, acor, imon, inln, hmin, hmxi, nqu)
+        implicit none
         !..parameters..
-        integer nout
+        integer nout, it, j
         parameter(nout=6)
         integer ny2dim
         parameter(ny2dim=6)
@@ -740,10 +767,13 @@ contains
         double precision xout
         !..local scalars..
         integer i, ifail
+        logical(4) pressed
+        character(1) key
+        integer(c_int), parameter :: esc = 27
         !..external subroutines..
         external d02xkf
         !..common blocks..
-        common xout
+        common xout, it
         !..executable statements..
         if (imon .ne. 1) return
 20      if (.not. (t - hlast .lt. xout .and. xout .le. t)) return
@@ -754,10 +784,32 @@ contains
         if (ifail .ne. 0) then
             imon = -2
         else
-            write (nout, 99999) xout, (r(i), i=1, n)
+            !write (nout, 99999) xout, (r(i), i=1, n)
+            eta(:, it) = eff(p(:, nz))
+            etag(:, it) = pitch**2/(pitch**2 + 1)*eta(:, it)
+            write (*, '(a,f12.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,\,a)') 'time = ', xout, '   |f1| = ', abs(r(1)), '   |f2| = ', abs(r(3)), &
+                '   |f3| = ', abs(r(5)), '   eff1 = ', eta(1, it), '   eff2 = ', eta(2, it), char(13)
+            do j = 1, n
+                f(j, it) = r(j)
+            end do
             xout = xout + dt
+            it = it + 1
+            pressed = peekcharqq()
+            if (pressed) then
+                key = getcharqq()
+                if (ichar(key) .eq. esc) then
+                    write (*, '(/,a)') 'quit?'
+                    key = getcharqq()
+                    if (ichar(key) .eq. 121 .or. ichar(key) .eq. 89) then
+                        nt = it - 1
+                        imon = -2
+                        !return
+                    end if
+                end if
+            end if
             if (xout .lt. tend) go to 20
         end if
+
         return
 
 99999   format(1x, f8.3, 6(f13.5, 2x))

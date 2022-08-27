@@ -35,26 +35,28 @@ program sys15f
 
     do i = 2, nt
         do j = 1, 3
-            w(j, i - 1) = imag(log(f(2*j - 1, i)*exp(ic*f(2*j, i))/(f(2*j - 1, i - 1)*exp(ic*f(2*j, i - 1)))))/dt
+            !w(j, i - 1) = dimag(log(f(2*j - 1, i)*cdexp(ic*f(2*j, i))/(f(2*j - 1, i - 1)*cdexp(ic*f(2*j, i - 1)))))/dt
+            w(j, i - 1) = (f(2*j, i) - f(2*j, i - 1))/dt
         end do
     end do
 
     phi(:, 1) = 0; 
     do i = 2, nt
         do j = 1, 3
-            phi(j, i) = phi(j, i - 1) + imag(log(f(2*j - 1, i)*exp(ic*f(2*j, i))/(f(2*j - 1, i - 1)*exp(ic*f(2*j, i - 1)))))
+            phi(j, i) = phi(j, i - 1) + dimag(log(f(2*j - 1, i)*cdexp(ic*f(2*j, i))/(f(2*j - 1, i - 1)*cdexp(ic*f(2*j, i - 1)))))
         end do
     end do
 
     breaknum(:) = 0
-    phitmp0(1) = f(2*1 - 1, 1)*exp(ic*f(2*1, 1))
-    phitmp0(2) = f(2*2 - 1, 1)*exp(ic*f(2*2, 1))
-    phitmp0(3) = f(2*3 - 1, 1)*exp(ic*f(2*3, 1))
+    fcomp(1) = f(2*1 - 1, 1)*cdexp(ic*f(2*1, 1))
+    fcomp(2) = f(2*2 - 1, 1)*cdexp(ic*f(2*2, 1))
+    fcomp(3) = f(2*3 - 1, 1)*cdexp(ic*f(2*3, 1))
+    phitmp0(:) = datan2(dimag(fcomp(:)), dreal(fcomp(:)))
     !phitmp0(:) = datan2(dimag(f(:, 1)), dreal(f(:, 1)))
     phios(:, 1) = phitmp0(:)
     do i = 2, nt
         do j = 1, 3
-            fc = f(2*j - 1, i)*exp(ic*f(2*j, i))
+            fc = f(2*j - 1, i)*cdexp(ic*f(2*j, i))
             phitmp1(j) = datan2(dimag(fc), dreal(fc))
             if ((phitmp1(j) - phitmp0(j)) .gt. pi) breaknum(j) = breaknum(j) - 1
             if ((phitmp1(j) - phitmp0(j)) .lt. -pi) breaknum(j) = breaknum(j) + 1
@@ -76,18 +78,20 @@ program sys15f
 
     open (1, file='F.dat')
     do i = 1, nt
-        write (1, '(4e17.8)') tax(i), abs(f(1, i)), abs(f(3, i)), abs(f(5, i))
+        !write (1, '(4e17.8)') tax(i), dabs(f(1, i)), dabs(f(3, i)), dabs(f(5, i))
+        write (1, '(4e17.8)') tax(i), f(1, i), f(3, i), f(5, i)
     end do
     close (1)
 
-    open (1, file='FCOMP.dat')
+    open (13, file='FCMPLX.dat')
     do i = 1, nt
-        fcarr(1) = f(2*1 - 1, i)*exp(ic*f(2*1, i))
-        fcarr(2) = f(2*2 - 1, i)*exp(ic*f(2*2, i))
-        fcarr(3) = f(2*3 - 1, i)*exp(ic*f(2*3, i))
-        write (1, '(7e17.8)') tax(i), real(fcarr(1)), imag(fcarr(1)), real(fcarr(2)), imag(fcarr(2)), real(fcarr(3)), imag(fcarr(3))
+        fcomp(1) = f(2*1 - 1, i)*cdexp(ic*f(2*1, i))
+        fcomp(2) = f(2*2 - 1, i)*cdexp(ic*f(2*2, i))
+        fcomp(3) = f(2*3 - 1, i)*cdexp(ic*f(2*3, i))
+        write (13, '(7e17.8)') tax(i), dreal(fcomp(1)), dimag(fcomp(1)), dreal(fcomp(2)), dimag(fcomp(2)), &
+            dreal(fcomp(3)), dimag(fcomp(3))
     end do
-    close (1)
+    close (13)
 
     open (2, file='E.dat')
     do i = 1, nt
@@ -103,7 +107,8 @@ program sys15f
 
     open (1, file='P.dat')
     do i = 1, nt
-        write (1, '(4e17.8)') tax(i), phi(1, i), phi(2, i), phi(3, i)
+        !write (1, '(4e17.8)') tax(i), phi(1, i), phi(2, i), phi(3, i)
+        write (1, '(4e17.8)') tax(i), f(2, i), f(4, i), f(6, i)
     end do
     close (1)
 
