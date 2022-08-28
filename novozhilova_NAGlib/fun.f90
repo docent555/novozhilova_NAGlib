@@ -4,7 +4,7 @@ module fun
 
     integer(c_int) ne, nt, nz, freq_out, neqp, lenwrk, l, method, ifail, neqf, lwork, liwork, nrd, it
     real(c_double) zex, dz, tend, dtr(2), q(3), i(2), th(2), a(2), dcir(2), r(2), &
-        f0(3), dt, pitch, f10, f20, f30, ptol, hstart, zstart, xout
+        f0(3), dt, pitch, f10, f20, f30, p10, p20, p30, ptol, hstart, zstart, xout
     complex(c_double_complex) fp(2)
     logical(c_bool) errass
 
@@ -58,8 +58,11 @@ contains
         end do
 
         f(1, 1) = f10
+        f(2, 1) = p10
         f(3, 1) = f20
+        f(4, 1) = p20
         f(5, 1) = f30
+        f(6, 1) = p30
 
         do ii = 1, nt
             tax(ii) = (ii - 1)*dt
@@ -121,15 +124,15 @@ contains
         use, intrinsic :: iso_c_binding
         import
         implicit none
-        
+
         real(8) ftol, ptol
 
         namelist /param/ ne, tend, zex, q1, q2, q3, i1, i2, th1, th2, a1, a2, dtr1, dtr2, &
-            dcir1, dcir2, r1, r2, f10, f20, f30, dt, dz, pitch, ftol, ptol
+            dcir1, dcir2, r1, r2, f10, f20, f30, p10, p20, p30, dt, dz, pitch, ftol, ptol
 
         real(c_double) q1, q2, q3, i1, i2, th1, th2, a1, a2, dtr1, dtr2, dcir1, dcir2, r1, r2
 
-        open (unit=1, file='input_fortran.dat', status='old', err=101)
+        open (unit=1, file='input_fortran.in', status='old', err=101)
         read (unit=1, nml=param, err=102)
         close (unit=1)
 
@@ -153,8 +156,118 @@ contains
 
         return
 101     print *, "error of file open"; pause; stop
-102     print *, 'error of reading file "input_fortran.dat"'; pause; stop
+102     print *, 'error of reading file "input_fortran.in"'; pause; stop
     end subroutine read_param
+
+    subroutine write_results()
+
+        implicit none
+
+        integer i, j
+
+        do i = 2, nt
+            do j = 1, 3
+                !w(j, i - 1) = dimag(log(f(2*j - 1, i)*cdexp(ic*f(2*j, i))/(f(2*j - 1, i - 1)*cdexp(ic*f(2*j, i - 1)))))/dt
+                w(j, i - 1) = (f(2*j, i) - f(2*j, i - 1))/dt
+            end do
+        end do
+
+        phi(:, 1) = 0; 
+        do i = 2, nt
+            do j = 1, 3
+               phi(j, i) = phi(j, i - 1) + dimag(log(f(2*j - 1, i)*cdexp(ic*f(2*j, i))/(f(2*j - 1, i - 1)*cdexp(ic*f(2*j, i - 1)))))
+            end do
+        end do
+
+        breaknum(:) = 0
+        fcomp(1) = f(2*1 - 1, 1)*cdexp(ic*f(2*1, 1))
+        fcomp(2) = f(2*2 - 1, 1)*cdexp(ic*f(2*2, 1))
+        fcomp(3) = f(2*3 - 1, 1)*cdexp(ic*f(2*3, 1))
+        phitmp0(:) = datan2(dimag(fcomp(:)), dreal(fcomp(:)))
+        !phitmp0(:) = datan2(dimag(f(:, 1)), dreal(f(:, 1)))
+        phios(:, 1) = phitmp0(:)
+        do i = 2, nt
+            do j = 1, 3
+                fc = f(2*j - 1, i)*cdexp(ic*f(2*j, i))
+                phitmp1(j) = datan2(dimag(fc), dreal(fc))
+                if ((phitmp1(j) - phitmp0(j)) .gt. pi) breaknum(j) = breaknum(j) - 1
+                if ((phitmp1(j) - phitmp0(j)) .lt. -pi) breaknum(j) = breaknum(j) + 1
+                phios(j, i) = phitmp1(j) + 2.*pi*breaknum(j)
+                !phios(j, i) = phitmp1(j)
+                phitmp0(j) = phitmp1(j)
+            end do
+        end do
+
+        do i = 1, nt - 1
+            do j = 1, 3
+                wos(j, i) = (phios(j, i + 1) - phios(j, i))/dt
+            end do
+        end do
+
+        write (*, '(/)')
+
+        pause
+
+        open (1, file='F.dat')
+        do i = 1, nt
+            !write (1, '(4e17.8)') tax(i), dabs(f(1, i)), dabs(f(3, i)), dabs(f(5, i))
+            write (1, '(4e17.8)') tax(i), f(1, i), f(3, i), f(5, i)
+        end do
+        close (1)
+
+        open (13, file='FCMPLX.dat')
+        do i = 1, nt
+            fcomp(1) = f(2*1 - 1, i)*cdexp(ic*f(2*1, i))
+            fcomp(2) = f(2*2 - 1, i)*cdexp(ic*f(2*2, i))
+            fcomp(3) = f(2*3 - 1, i)*cdexp(ic*f(2*3, i))
+            write (13, '(7e17.8)') tax(i), dreal(fcomp(1)), dimag(fcomp(1)), dreal(fcomp(2)), dimag(fcomp(2)), &
+                dreal(fcomp(3)), dimag(fcomp(3))
+        end do
+        close (13)
+
+        open (2, file='E.dat')
+        do i = 1, nt
+            write (2, '(5e17.8)') tax(i), eta(1, i), etag(1, i), eta(2, i), etag(2, i)
+        end do
+        close (2)
+
+        open (3, file='W.dat')
+        do i = 1, nt - 1
+            write (3, '(4e17.8)') tax(i + 1), w(1, i), w(2, i), w(3, i)
+        end do
+        close (3)
+
+        open (1, file='P.dat')
+        do i = 1, nt
+            !write (1, '(4e17.8)') tax(i), phi(1, i), phi(2, i), phi(3, i)
+            write (1, '(4e17.8)') tax(i), f(2, i), f(4, i), f(6, i)
+        end do
+        close (1)
+
+        open (1, file='POS.dat')
+        do i = 1, nt
+            write (1, '(4e17.8)') tax(i), phios(1, i), phios(2, i), phios(3, i)
+        end do
+        close (1)
+
+        open (3, file='WOS.dat')
+        do i = 1, nt - 1
+            write (3, '(4e17.8)') tax(i + 1), wos(1, i), wos(2, i), wos(3, i)
+        end do
+        close (3)
+
+        stop
+        
+101     print *, 'error of file open.'
+        pause
+        stop
+102     print *, 'error of file reading.'
+        pause
+        stop
+103     print *, 'error of file writing.'
+        pause
+        stop
+    end subroutine write_results
 
     subroutine ode4f()
         import
@@ -200,7 +313,7 @@ contains
             const(i) = 0.0d0
         end do
         tcrit = tout
-        ifail = 0
+        ifail = 1
         y(:) = f(:, 1)
 
         !solve eq. at t=0
@@ -213,7 +326,7 @@ contains
             zwant = i*dz
             call d02pcf(dpdz, zwant, zgot, pgot, ppgot, pmax, workp, ifail)
 
-            if (ifail .ne. 0) then            
+            if (ifail .ne. 0) then
                 write (*, *)
                 write (*, 99998) 'exit d02pcf with ifail = ', ifail, '  and t = ', t
                 pause
@@ -229,9 +342,9 @@ contains
 
         call d02nvf(neqmax, ny2dim, maxord, 'newton', petzld, const, tcrit, hmin, hmax, &
                     h0, maxstp, mxhnil, 'average-l2', rwork, ifail)
-        call d02nsf(neq, neqmax,'a', nwkjac, rwork, ifail)
+        call d02nsf(neq, neqmax, 'a', nwkjac, rwork, ifail)
 
-        itrace = 0
+        itrace = -1
         ifail = 1
         xout = dt
         it = 2
@@ -483,7 +596,7 @@ contains
             zwant = zax(jj + 1)
             call d02pcf(dpdz, zwant, zgot, pgot, ppgot, pmax, workp, ifail)
 
-            if (ifail .ne. 0) then        
+            if (ifail .ne. 0) then
                 write (*, *)
                 write (*, 99998) 'exit d02pcf with ifail = ', ifail, '  and t = ', t
                 pause
@@ -728,11 +841,11 @@ contains
         pp(3, 4) = -hxd*q32*(i2*(x2i*sin2 + x2r*cos2) + 2*r2*f3*dsin(ph322))
         pp(3, 5) = -hxd*2*r2*q32*dcos(ph322)
         pp(3, 6) = -hxd*(-2*r2*q32*f3*dsin(ph322))
-        
+
         !pp(4,1) = 0
-        !pp(4,2) = 0       
+        !pp(4,2) = 0
         pp(4, 3) = -hxd*(-q32/f2**2*(i2*(x2r*cos2 + x2i*sin2) + 2*r2*f3*dsin(ph322)))
-        pp(4, 4) = 1.0d0 - hxd*(q32/f2*(i2*(-x2r*sin2 + x2i*cos2) - 2*r2*f3*dcos(ph322)))        
+        pp(4, 4) = 1.0d0 - hxd*(q32/f2*(i2*(-x2r*sin2 + x2i*cos2) - 2*r2*f3*dcos(ph322)))
         pp(4, 5) = -hxd*2*r2*q32/f2*dsin(ph322)
         pp(4, 6) = -hxd*2*r2*q32*f3/f2*dcos(ph322)
 
@@ -747,7 +860,7 @@ contains
         pp(6, 2) = -hxd*a1*f1/f3*dcos(phi13)
         pp(6, 3) = -hxd*a2/f3*dsin(phi23)
         pp(6, 4) = -hxd*a2*f2/f3*dcos(phi23)
-        pp(6, 5) = hxd/f3**2*(a1*f1*dsin(phi13) + a2*f2*dsin(phi23))        
+        pp(6, 5) = hxd/f3**2*(a1*f1*dsin(phi13) + a2*f2*dsin(phi23))
         pp(6, 6) = 1.0d0 - hxd*(-a1*f1/f3*dcos(phi13) - a2*f2/f3*dcos(phi23))
 
         return
@@ -789,8 +902,8 @@ contains
             !write (nout, 99999) xout, (r(i), i=1, n)
             eta(:, it) = eff(p(:, nz))
             etag(:, it) = pitch**2/(pitch**2 + 1)*eta(:, it)
-            write (*, '(a,f12.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,\,a)') 'time = ', xout, '   |f1| = ', abs(r(1)), '   |f2| = ', abs(r(3)), &
-                '   |f3| = ', abs(r(5)), '   eff1 = ', eta(1, it), '   eff2 = ', eta(2, it), char(13)
+       write (*, '(a,f12.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,a,f10.7,\,a)') 'time = ', xout, '   |f1| = ', r(1), '   |f2| = ', r(3), &
+                '   |f3| = ', r(5), '   eff1 = ', eta(1, it), '   eff2 = ', eta(2, it), char(13)
             do j = 1, n
                 f(j, it) = r(j)
             end do
@@ -804,7 +917,8 @@ contains
                     key = getcharqq()
                     if (ichar(key) .eq. 121 .or. ichar(key) .eq. 89) then
                         nt = it - 1
-                        imon = -2
+                        call write_results()
+                        !imon = -2
                         !return
                     end if
                 end if
